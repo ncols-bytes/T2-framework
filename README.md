@@ -21,7 +21,7 @@ docker pull xdeng/transformers:latest
         ├── dev.table_col_type.json
         ├── test.table_col_type.json
         ├── entity_vocab.txt
-    		└── type_vocab.txt
+    	└── type_vocab.txt
 ```
 
 2. Download the pre-trained checkpoint from [this link](https://buckeyemailosu-my.sharepoint.com/personal/deng_595_buckeyemail_osu_edu/_layouts/15/onedrive.aspx?ga=1&id=%2Fpersonal%2Fdeng%5F595%5Fbuckeyemail%5Fosu%5Fedu%2FDocuments%2FBuckeyeBox%20Data%2FTURL%2Fcheckpoint%2Fpretrained) and store it in the `checkpoints/pretrained_hybrib_model` directory.
