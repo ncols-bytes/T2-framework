@@ -1,0 +1,11 @@
+python evaluation.py \
+    --mysql_host=172.17.0.2 \
+    --mysql_user=root \
+    --mysql_password=root \
+    --mysql_database=wikitable \
+    --data_dir=data/wikitables_v2/ \
+    --fitlter_model_conf="configs/filtering-model-config.json" \
+    --fitlter_model_path="checkpoints/fitltering_model/pytorch_model.bin" \
+    --verifi_model_conf="configs/verification-model-config.json" \
+    --verifi_model_path="checkpoints/verification_model/pytorch_model.bin" \
+    --verif_conf="verification/verif_conf.json"
