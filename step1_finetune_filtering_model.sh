@@ -3,6 +3,7 @@ CUDA_VISIBLE_DEVICES="0" python finetuning.py \
     --model_name_or_path=checkpoints/pretrained_hybrid_model \
     --model_type=1 \
     --config_name=configs/filtering-model-config.json \
+    --verif_conf="verification/verif_conf.json" \
     --do_train \
     --data_dir=data/wikitables_v2 \
     --evaluate_during_training \
