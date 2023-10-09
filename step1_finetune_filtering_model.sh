@@ -1,6 +1,6 @@
 CUDA_VISIBLE_DEVICES="0" python finetuning.py \
     --output_dir=checkpoints/fitltering_model \
-    --model_name_or_path=checkpoints/pretrained_hybrib_model \
+    --model_name_or_path=checkpoints/pretrained_hybrid_model \
     --model_type=1 \
     --config_name=configs/filtering-model-config.json \
     --do_train \
