@@ -20,7 +20,7 @@ In addition, you need to set up a MySQL environment (8.0.x is preferred) and ens
 
 ### 1. WikiTables data
 
-Download the following files with the same name from [this link](https://buckeyemailosu-my.sharepoint.com/personal/deng_595_buckeyemail_osu_edu/_layouts/15/onedrive.aspx?ga=1&id=%2Fpersonal%2Fdeng%5F595%5Fbuckeyemail%5Fosu%5Fedu%2FDocuments%2FBuckeyeBox%20Data%2FTURL%2Fdata) and put them in the `data/wikitables_v2` directory.
+Download the following files with the same name from the `data` directory of [this link](https://buckeyemailosu-my.sharepoint.com/:f:/g/personal/deng_595_buckeyemail_osu_edu/EjZWRtslWX9CubQ92jlmNTgB74hxxXszy9BUaXG5OL5F-g?e=HN2qtD) and put them in the `data/wikitables_v2` directory at the root of the project.
 
 ```
 ├── data
@@ -75,7 +75,7 @@ The directory structure after unzipping:
 ```
 
 ### 4. Pre-trained hybrid model
-Download the pre-trained checkpoint from [this link](https://buckeyemailosu-my.sharepoint.com/personal/deng_595_buckeyemail_osu_edu/_layouts/15/onedrive.aspx?ga=1&id=%2Fpersonal%2Fdeng%5F595%5Fbuckeyemail%5Fosu%5Fedu%2FDocuments%2FBuckeyeBox%20Data%2FTURL%2Fcheckpoint%2Fpretrained) and put it in the `checkpoints/pretrained_hybrid_model` directory.
+Download the pre-trained checkpoint from the `checkpoint/pretrained` directory of [this link](https://buckeyemailosu-my.sharepoint.com/:f:/g/personal/deng_595_buckeyemail_osu_edu/EjZWRtslWX9CubQ92jlmNTgB74hxxXszy9BUaXG5OL5F-g?e=HN2qtD) and put it in the `checkpoints/pretrained_hybrid_model` directory at the root of the project.
 
 ```
 ├── checkpoints
