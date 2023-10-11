@@ -32,7 +32,7 @@ Download the following files with the same name from [this link](https://buckeye
     	└── type_vocab.txt
 ```
 
-Please note that the `train.table_col_type.json` file in the link has been truncated, causing the JSON format to be corrupted. You need to modify the end of this JSON file to restore its correct format.
+Please note that the `train.table_col_type.json` file in the link has been truncated, causing the JSON format to be corrupted. You need to modify the end of `train.table_col_type.json` to restore its correct format.
 
 ### 2. GitTables data
 
@@ -102,14 +102,14 @@ $ ./step2_finetune_verification_model.sh
 After running successfully, it will generate a checkpoint file named `pytorch_model.bin` in the `checkpoints/verification_model` directory.
 
 ### Step3: Build MySQL table for testing
-Run `step3_build_mysql_table_for_test.sh`:
+Replace the parameters in `step3_build_mysql_table_for_test.sh` and run it:
 ```sh
 $ ./step3_build_mysql_table_for_test.sh
 ```
-After running successfully, it will create 3 database in MySQL.
+After running successfully, it will create 3 databases in MySQL.
 
 ### Step4: Evaluation
-Run `step2_finetune_verification_model.sh`:
+Replace the parameters in `step4_evaluation.sh` and run it:
 ```sh
 $ ./step4_evaluation.sh
 ```
