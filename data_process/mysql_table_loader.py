@@ -54,7 +54,7 @@ class MysqlTableLoader():
         try:
             cursor = self.connection.cursor()
 
-            table_id = table_name[4:].replace("_", "-")
+            table_id = table_name[6:].replace("_", "-")
             
             get_table_comment_sql = f"SELECT table_comment FROM information_schema.tables WHERE table_schema = '{self.database}' AND table_name = '{table_name}'"
             cursor.execute(get_table_comment_sql)
@@ -90,7 +90,7 @@ class MysqlTableLoader():
     def get_entity_data(self, table_name, col_num, entity_id_map):
         try:
             cursor = self.connection.cursor()
-            table_id = table_name[4:].replace("_", "-")
+            table_id = table_name[6:].replace("_", "-")
 
             select_data_sql = f"select * from {table_name} limit 200"
             cursor.execute(select_data_sql)
@@ -102,8 +102,11 @@ class MysqlTableLoader():
                 col_idx = 0
                 for cell_value in row:
                     if cell_value != None:
-                        cell_id = entity_id_map[table_id][str(row_idx) + '-' + str(col_idx)]
-                        entities[col_idx].append([[row_idx, col_idx], [cell_id, cell_value]])
+                        if table_id in entity_id_map:
+                            entity_id = entity_id_map[table_id][str(row_idx) + '-' + str(col_idx)]
+                        else:
+                            entity_id = 0
+                        entities[col_idx].append([[row_idx, col_idx], [entity_id, cell_value]])
                     col_idx += 1
                 row_idx += 1
 

@@ -1,8 +1,10 @@
 python evaluation.py \
-    --mysql_host=172.17.0.2 \
-    --mysql_user=root \
-    --mysql_password=root \
-    --mysql_database=wikitable \
+    --mysql_host=$(mysql_host) \
+    --mysql_user=$(mysql_user) \
+    --mysql_password=$(mysql_password) \
+    --wikitables_database=wikitable \
+    --gittables1_database=parent_tables \
+    --gittables2_database=real_time_tables \
     --data_dir=data/wikitables_v2/ \
     --fitlter_model_conf="configs/filtering-model-config.json" \
     --fitlter_model_path="checkpoints/fitltering_model/pytorch_model.bin" \

@@ -47,7 +47,6 @@ def load_entity_vocab(data_dir, ignore_bad_title=True, min_ent_count=1):
                     'mid': entity_mid,
                     'count': int(count)
                 }
-    print('total number of entity: %d\nremove because of empty title: %d\nremove because count<%d: %d'%(len(entity_vocab),bad_title,min_ent_count,few_entity))
     return entity_vocab
 
 def load_type_vocab(data_dir, model_type, types):

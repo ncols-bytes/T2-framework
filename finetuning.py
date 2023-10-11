@@ -175,6 +175,8 @@ def train(args, config, train_dataset, model, eval_dataset = None):
             labels = labels.to(args.device)
             histogram = histogram.to(args.device)
 
+            model.train()
+
             if args.model_type == 1:
                 outputs = model(input_tok, input_tok_type, input_tok_pos, input_tok_mask, column_header_mask, labels_mask, labels, histogram)
             elif args.model_type == 2:
@@ -188,10 +190,7 @@ def train(args, config, train_dataset, model, eval_dataset = None):
                 outputs = model(input_tok, input_tok_type, input_tok_pos, input_tok_mask,\
                                 input_ent_text, input_ent_text_length, input_ent, input_ent_type, input_ent_mask, column_entity_mask, 
                                 column_header_mask, labels_mask, labels, histogram)
-
-            model.train()
             
-            # model outputs are always tuple in transformers (see doc)
             loss = outputs[0]
             prediction_scores = outputs[1]
             ap = average_precision(prediction_scores.view(-1, config.class_num), labels.view((-1, config.class_num)))
