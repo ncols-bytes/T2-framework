@@ -11,10 +11,10 @@ For convenience, you can use the following docker image to run this repository.
 $ docker pull neoffaa/transformers:v1
 
 # Run a container from the image
-$ docker run -itd -v $(source_path):$(target_path) --name $(container_name) --gpus all neoffaa/transformers:v1
+$ docker run -itd -v <source_path>:<target_path> --name <container_name> --gpus all neoffaa/transformers:v1
 ```
 
-In addition, you need to set up a MySQL environment (8.0.x is preferred) and ensure that the docker container can access it.
+In addition, you need to set up a MySQL server (8.0.x is preferred) and ensure that the docker container can access it.
 
 ## Prepare Data
 
@@ -85,32 +85,126 @@ Download the pre-trained checkpoint from the `checkpoint/pretrained` directory o
 
 ## Run T2-framework
 
-### Step1: Fine tune Filtering Model
-Run `step1_finetune_filtering_model.sh`:
+### 1. Filtering Model
+Run the following commands to fine tune the Filtering Model:
 ```sh
-$ ./step1_finetune_filtering_model.sh
+CUDA_VISIBLE_DEVICES="0"
+python finetuning.py \
+    --do_train \
+    --model_type=1 \
+    --data_dir="data/wikitables_v2" \
+    --hybrid_model_path="checkpoints/pretrained_hybrid_model" \
+    --hybrid_model_config="configs/hybrid_model_config.json" \
+    --focal_loss_alpha=0.5 \
+    --use_histogram_feature \
+    --output_dir="checkpoints/fitltering_model/with_hist/alpha0.5" \
+    --evaluate_during_training \
+    --overwrite_output_dir
 ```
 
-After running successfully, it will generate a checkpoint file named `pytorch_model.bin` in the `checkpoints/fitltering_model` directory.
+Parameter explanations:
+- `--do_train`: Run training.
+- `--model_type`: 1-Filtering Model; 2-Verification Model.
+- `--data_dir`: The input data directory.
+- `--hybrid_model_path`: The path of pre-trained hybrid model.
+- `--hybrid_model_config`: The config of pre-trained hybrid model.
+- `--focal_loss_alpha`: The alpha value of focal loss in filtering model.
+- `--use_histogram_feature`: Whether to use histogram feature.
+- `--output_dir`: The model output directory.
+- `--evaluate_during_training`: Run evaluation during training at each logging step.
+- `--overwrite_output_dir`: Overwrite the content of the output directory.
 
-
-### Step2: Fine tune Verification Model
-Run `step2_finetune_verification_model.sh`:
+### 2. Verification Model
+Run the following commands to fine tune the deep learning verification model:
 ```sh
-$ ./step2_finetune_verification_model.sh
+CUDA_VISIBLE_DEVICES="0" 
+python finetuning.py \
+    --do_train \
+    --model_type=2 \
+    --data_dir="data/wikitables_v2" \
+    --hybrid_model_path="checkpoints/pretrained_hybrid_model" \
+    --hybrid_model_config="configs/hybrid_model_config.json" \
+    --verif_conf="verification/verif_conf.json" \
+    --use_histogram_feature \
+    --output_dir="checkpoints/verification_model/with_hist" \
+    --evaluate_during_training \
+    --overwrite_output_dir
 ```
-After running successfully, it will generate a checkpoint file named `pytorch_model.bin` in the `checkpoints/verification_model` directory.
 
-### Step3: Build MySQL table for testing
-Replace the parameters in `step3_build_mysql_table_for_test.sh` and run it:
-```sh
-$ ./step3_build_mysql_table_for_test.sh
-```
-After running successfully, it will create 3 databases in MySQL.
+Parameter explanations:
+- `--do_train`: Run training.
+- `--model_type`: 1-Filtering Model; 2-Verification Model.
+- `--data_dir`: The input data directory.
+- `--hybrid_model_path`: The path of pre-trained hybrid model.
+- `--hybrid_model_config`: The config of pre-trained hybrid model.
+- `--verif_conf`: The verification config that includes mapping relationships between tags and verifiers.
+- `--use_histogram_feature`: Whether to use histogram feature.
+- `--output_dir`: The model output directory.
+- `--evaluate_during_training`: Run evaluation during training at each logging step.
+- `--overwrite_output_dir`: Overwrite the content of the output directory.
 
-### Step4: Evaluation
-Replace the parameters in `step4_evaluation.sh` and run it:
+Besides, the knowledge-based verification models are generated in the `verification/verifiers.py` and do not require training.
+
+### 3. MySQL tables for testing
+Run the following commands to build MySQL tables for testing:
 ```sh
-$ ./step4_evaluation.sh
+python data_process/build_mysql_table.py \
+    --mysql_host=<mysql_host> \
+    --mysql_port=<mysql_port> \
+    --mysql_user=<mysql_user> \
+    --mysql_password=<mysql_password> \
+    --wikitables_database=wikitable \
+    --git_parent_database=parent_tables \
+    --git_real_time_database=real_time_tables \
+    --data_dir="./data"
 ```
-After running successfully, it will print the evaluation results.
+Parameter explanations:
+- `--mysql_host`: The hostname or IP address of the MySQL server.
+- `--mysql_port`: The port number of the MySQL server.
+- `--mysql_user`: The MySQL username for the connection.
+- `--mysql_password`: The password associated with the username.
+- `--wikitables_database`: An empty database used to store wikitables. If it doesn't exist, the program will automatically create it.
+- `--git_parent_database`: An empty database used to store the parent_tables from GitTables. If it doesn't exist, the program will automatically create it.
+- `--git_real_time_database`: An empty database used to store the real_time_tables from GitTables. If it doesn't exist, the program will automatically create it.
+- `--data_dir`: The data directory, containing wikitables and gittables data, as detailed in the "Prepare Data" section.
+
+### 4. Evaluation
+Run the following commands to get evaluation result:
+```sh
+python evaluation.py \
+    --mysql_host=<mysql_host> \
+    --mysql_port=<mysql_port> \
+    --mysql_user=<mysql_user> \
+    --mysql_password=<mysql_password> \
+    --wikitables_database=wikitable \
+    --git_parent_database=parent_tables \
+    --git_real_time_database=real_time_tables \
+    --wikitables_data_dir="data/wikitables_v2/" \
+    --hybrid_model_config="configs/hybrid_model_config.json" \
+    --fitlter_model_path="checkpoints/fitltering_model/with_hist/alpha0.5/pytorch_model.bin" \
+    --verifi_model_path="checkpoints/verification_model/with_hist/pytorch_model.bin" \
+    --use_histogram_feature \
+    --verif_conf="verification/verif_conf.json" \
+    --eval_dataset=wikitables \
+    --enable_phase1
+```
+Parameter explanations:
+- `--mysql_host`: The hostname or IP address of the MySQL server.
+- `--mysql_port`: The port number of the MySQL server.
+- `--mysql_user`: The MySQL username for the connection.
+- `--mysql_password`: The password associated with the username.
+- `--wikitables_database`: The database that stores wikitables.
+- `--git_parent_database`: The database that stores parent_tables from GitTables.
+- `--git_real_time_database`: The database that stores real_time_tables from GitTables.
+- `--wikitables_data_dir`: The original data directory of wikitables.
+- `--hybrid_model_config`: The config of pre-trained hybrid model.
+- `--fitlter_model_path`: The fitltering model directory.
+- `--verifi_model_path`: The deep learning verification model directory.
+- `--use_histogram_feature`: Whether to use histogram feature. It should be consistent with the setting of model training.
+- `--verif_conf`: The verification config that includes mapping relationships between tags and verifiers.
+- `--eval_dataset`: The (mixed) dataset used for evaluation, with optional values: `wikitables`, `mix_wr`, `mix_wp`, `mix_wpr` or `mix_pr`.
+- `--enable_phase1`: Whether to enable filtering phase. If not enabled, it will become `EC`, which means exhaustive check of all verification models .
+
+
+
+After running successfully, it will print the evaluation results for the selected dataset, including tagging performance (only for wikitables), execution time and ratio of scanned tables.

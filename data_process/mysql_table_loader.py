@@ -2,8 +2,9 @@ import mysql.connector
 import numpy as np
 
 class MysqlTableLoader():
-    def __init__(self, host, username, password, database):
+    def __init__(self, host, port, username, password, database):
         self.host = host
+        self.port = port
         self.username = username
         self.password = password
         self.database = database
@@ -13,19 +14,20 @@ class MysqlTableLoader():
         try:
             self.connection = mysql.connector.connect(
                 host=self.host,
+                port=self.port,
                 user=self.username,
                 password=self.password,
                 database=self.database
             )
             if self.connection.is_connected():
-                print("Connected to MySQL Database")
+                print(f"Connected to MySQL Database({self.database})")
         except mysql.connector.Error as err:
             print(f"Error: {err}")
 
     def disconnect(self):
         if self.connection is not None and self.connection.is_connected():
             self.connection.close()
-            print("Disconnected from MySQL Database")
+            print(f"Disconnected from MySQL Database({self.database})")
 
     def list_all_tables(self):
         try:

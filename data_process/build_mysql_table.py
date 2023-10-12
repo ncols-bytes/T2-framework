@@ -254,25 +254,27 @@ def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--mysql_host", default=None, type=str, required=True)
+    parser.add_argument("--mysql_port", default=3306, type=int, required=False)
     parser.add_argument("--mysql_user", default=None, type=str, required=True)
     parser.add_argument("--mysql_password", default=None, type=str, required=True)
     parser.add_argument("--wikitables_database", default=None, type=str, required=True)
-    parser.add_argument("--gittables1_database", default=None, type=str, required=True)
-    parser.add_argument("--gittables2_database", default=None, type=str, required=True)
+    parser.add_argument("--git_parent_database", default=None, type=str, required=True)
+    parser.add_argument("--git_real_time_database", default=None, type=str, required=True)
     parser.add_argument("--data_dir", default=None, type=str, required=True)
 
     args = parser.parse_args()
 
     connection = mysql.connector.connect(
         host=args.mysql_host,
+        port=args.mysql_port,
         user=args.mysql_user,
         password=args.mysql_password,
     )
     build_wikitables(args.data_dir, args.wikitables_database, connection)
 
-    build_gittables(args.data_dir, connection, args.gittables1_database, 'parent_tables')
+    build_gittables(args.data_dir, connection, args.git_parent_database, 'parent_tables')
 
-    build_gittables(args.data_dir, connection, args.gittables2_database, 'real_time_tables')
+    build_gittables(args.data_dir, connection, args.git_real_time_database, 'real_time_tables')
 
     connection.close()
 

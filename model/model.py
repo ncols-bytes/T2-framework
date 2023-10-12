@@ -36,6 +36,7 @@ from model.transformers.file_utils import add_start_docstrings
 from model.transformers.modeling_bert import *
 from model.focal_loss import BinaryFocalLossWithLogits
 import torch.nn.functional as F
+from data_process.histogram_helper import *
 
 import pdb
 
@@ -800,9 +801,19 @@ class FilteringModel(BertPreTrainedModel):
         self.table.embeddings.ent_embeddings.weight.requires_grad = False
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-        self.fc1 = nn.Linear(config.hidden_size + config.histogram_len + 1, config.fc1_size, bias=True)
-        self.cls = nn.Linear(config.fc1_size, config.class_num, bias=True)
-        self.loss_fct = BinaryFocalLossWithLogits(alpha=config.focal_alpha, gamma=config.focal_gamma, reduction='none')
+        if config.use_histogram_feature:
+            self.fc1 = nn.Linear(config.hidden_size + HISTOGRAM_LEN + 1, 500, bias=True)
+            self.cls = nn.Linear(500, config.class_num, bias=True)
+        else:
+            self.cls = nn.Linear(config.hidden_size, config.class_num, bias=True)
+
+        alpha = 0.5
+        gamma = 0
+        if hasattr(config, 'focal_loss_alpha'):        
+            alpha = config.focal_loss_alpha
+        if hasattr(config, 'focal_loss_gamma'):        
+            gamma = config.focal_loss_gamma
+        self.loss_fct = BinaryFocalLossWithLogits(alpha=alpha, gamma=gamma, reduction='none')
 
         self.init_weights()
 
@@ -839,9 +850,13 @@ class VerificationModel(BertPreTrainedModel):
         self.table.embeddings.ent_embeddings.weight.requires_grad = False
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-        self.fc1 = nn.Linear(2*config.hidden_size + config.histogram_len + 1, config.fc1_size, bias=True)
-        self.fc2 = nn.Linear(config.fc1_size, config.fc2_size, bias=True)
-        self.cls = nn.Linear(config.fc2_size, config.class_num, bias=True)
+        if config.use_histogram_feature:
+            self.fc1 = nn.Linear(2*config.hidden_size + HISTOGRAM_LEN + 1, 1000, bias=True)
+            self.fc2 = nn.Linear(1000, 1000, bias=True)
+            self.cls = nn.Linear(1000, config.class_num, bias=True)
+        else:
+            self.cls = nn.Linear(2*config.hidden_size, config.class_num, bias=True)
+
         self.loss_fct = BCEWithLogitsLoss(reduction='none')
 
         self.init_weights()
@@ -871,83 +886,6 @@ class VerificationModel(BertPreTrainedModel):
         logits = self.dropout(logits)
         logits = self.cls(logits)
 
-        outputs = (logits,) + ent_outputs + tok_outputs
-        if labels is not None:
-            CT_loss = self.loss_fct(logits, labels)
-            CT_loss = torch.sum(CT_loss.mean(dim=-1)*labels_mask)/labels_mask.sum()
-            outputs = (CT_loss,) + outputs
-        return outputs  # (masked_lm_loss), (ltr_lm_loss), prediction_scores, (hidden_states), (attentions)
-
-class HybridTableCT(BertPreTrainedModel):
-    def __init__(self, config, is_simple=False):
-        super(HybridTableCT, self).__init__(config)
-
-        self.table = HybridTableModel(config, is_simple)
-        self.table.embeddings.ent_embeddings.weight.requires_grad = False
-        self.dropout = nn.Dropout(config.hidden_dropout_prob)
-
-        if config.mode in [6]:  # 6:screening model
-            self.fc1 = nn.Linear(config.hidden_size + 1025, 500, bias=True)
-            self.cls = nn.Linear(500, config.class_num, bias=True)
-            # self.loss_fct = BCEWithLogitsLoss(reduction='none')
-            self.loss_fct = BinaryFocalLossWithLogits(alpha=config.focal_alpha, gamma=config.focal_gamma, reduction='none')
-        elif config.mode in [7]:  # 7:verifier
-            self.fc1 = nn.Linear(2*config.hidden_size + 1025, 1000, bias=True)
-            self.fc2 = nn.Linear(1000, 1000, bias=True)
-            self.cls = nn.Linear(1000, config.class_num, bias=True)
-            self.loss_fct = BCEWithLogitsLoss(reduction='none')
-        elif config.mode in [0,3,9]:  # 0:best in TURL
-            self.cls = nn.Linear(2*config.hidden_size, config.class_num, bias=True)
-            self.loss_fct = BCEWithLogitsLoss(reduction='none')
-        elif config.mode in [8]:  # 8:screening model without histogram
-            self.cls = nn.Linear(config.hidden_size, config.class_num, bias=True)
-            self.loss_fct = BinaryFocalLossWithLogits(alpha=config.focal_alpha, gamma=config.focal_gamma, reduction='none')
-        else:
-            self.cls = nn.Linear(config.hidden_size, config.class_num, bias=True)
-            self.loss_fct = BCEWithLogitsLoss(reduction='none')
-
-        self.init_weights()
-
-    def load_pretrained(self, checkpoint):
-        self.table.load_pretrained(checkpoint,is_bert=False)
-
-    def forward(self, input_tok, input_tok_type, input_tok_pos, input_tok_mask,
-                input_ent_tok, input_ent_tok_length,
-                input_ent, input_ent_type, input_ent_mask,
-                column_entity_mask, column_header_mask, labels_mask, labels,
-                histogram):
-        # pdb.set_trace()
-        tok_outputs, ent_outputs, ent_candidates_embeddings = self.table(input_tok, input_tok_type, input_tok_pos, input_tok_mask, input_ent_tok, input_ent_tok_length, None, input_ent, input_ent_type, input_ent_mask, None)
-        tok_col_output = None
-        ent_col_output = None
-        if input_tok is not None:
-            tok_sequence_output = self.dropout(tok_outputs[0])
-            tok_col_output = torch.matmul(column_header_mask, tok_sequence_output)
-            tok_col_output /= column_header_mask.sum(dim=-1,keepdim=True).clamp(1.0,9999.0)
-        if input_ent_tok is not None or input_ent is not None:
-            ent_sequence_output = self.dropout(ent_outputs[0])
-            ent_col_output = torch.matmul(column_entity_mask, ent_sequence_output)
-            ent_col_output /= column_entity_mask.sum(dim=-1,keepdim=True).clamp(1.0,9999.0)
-
-        if histogram is not None:
-            if input_ent is not None:  # verifier
-                logits = torch.relu(self.fc1(torch.cat([tok_col_output, ent_col_output, histogram], dim=-1)))
-                logits = self.dropout(logits)
-                logits = torch.relu(self.fc2(logits))
-                logits = self.dropout(logits)
-            else:  # screening model
-                logits = torch.relu(self.fc1(torch.cat([tok_col_output, histogram], dim=-1)))
-                logits = self.dropout(logits)
-            logits = self.cls(logits)
-        else:
-            if input_tok is not None and input_ent_tok is not None:
-                logits = self.cls(torch.cat([tok_col_output, ent_col_output], dim=-1))
-            elif input_tok is not None:
-                logits = self.cls(tok_col_output)
-            elif input_ent_tok is not None or input_ent is not None:
-                logits = self.cls(ent_col_output)
-            else:
-                raise Exception
         outputs = (logits,) + ent_outputs + tok_outputs
         if labels is not None:
             CT_loss = self.loss_fct(logits, labels)

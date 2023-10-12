@@ -10,9 +10,5 @@
     "num_hidden_layers": 4,
     "type_vocab_size": 5,
     "vocab_size": 30522,
-    "ent_vocab_size": 926135,
-    "focal_alpha": 0.50,
-    "focal_gamma": 0,
-    "histogram_len": 1024,
-    "fc1_size": 500
+    "ent_vocab_size": 926135
 }

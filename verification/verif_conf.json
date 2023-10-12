@@ -1,6 +1,6 @@
 {
     "type_verifier_tags": {
-        "ml": [
+        "dl_model": [
             "time.event",
             "location.location",
             "sports.sports_league_season",

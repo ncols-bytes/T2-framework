@@ -215,7 +215,7 @@ class DataProcessor(Dataset):
         # pdb.set_trace()
         return processed_cols
 
-    def __init__(self, model_type, data_dir, entity_vocab, type_vocab, histogram_len=1024, max_column=10, max_input_tok=500, src="train", max_length = [50, 10, 10], force_new=False, tokenizer = None):
+    def __init__(self, model_type, data_dir, entity_vocab, type_vocab, max_column=10, max_input_tok=500, src="train", max_length = [50, 10, 10], force_new=False, tokenizer = None):
         if tokenizer is not None:
             self.tokenizer = tokenizer
         else:
@@ -230,7 +230,6 @@ class DataProcessor(Dataset):
         self.max_column = max_column
         self.entity_vocab = entity_vocab
         self.entity_wikid2id = {self.entity_vocab[x]['wiki_id']:x for x in self.entity_vocab}
-        self.histogram_len = histogram_len
 
         if src == 'train' or src == 'dev':
             self.type_vocab = type_vocab

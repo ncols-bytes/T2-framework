@@ -346,13 +346,13 @@ def main():
     ## Other parameters
     parser.add_argument("--model_type", default=1, type=int,
                         help="1: Filtering Model;2: Verification Model;")
-    parser.add_argument("--model_name_or_path", default="bert-base-cased", type=str,
+    parser.add_argument("--hybrid_model_path", default="bert-base-cased", type=str,
                         help="The model checkpoint for weights initialization.")
-    parser.add_argument("--config_name", default="", type=str,
-                        help="Optional pretrained config name or path if not the same as model_name_or_path")
+    parser.add_argument("--hybrid_model_config", default="", type=str,
+                        help="Optional pretrained config name or path if not the same as hybrid_model_path")
     parser.add_argument("--tokenizer_name", default="", type=str,
-                        help="Optional pretrained tokenizer name or path if not the same as model_name_or_path")
-    parser.add_argument("--cache_dir", default="", type=str,
+                        help="Optional pretrained tokenizer name or path if not the same as hybrid_model_path")
+    parser.add_argument("--cache_dir", default="cache", type=str,
                         help="Optional directory to store the pre-trained models downloaded from s3 (instread of the default one)")
     parser.add_argument("--block_size", default=-1, type=int,
                         help="Optional input sequence length after tokenization."
@@ -367,11 +367,11 @@ def main():
     parser.add_argument("--do_lower_case", action='store_true',
                         help="Set this flag if you are using an uncased model.")
 
-    parser.add_argument("--per_gpu_train_batch_size", default=4, type=int,
+    parser.add_argument("--per_gpu_train_batch_size", default=20, type=int,
                         help="Batch size per GPU/CPU for training.")
-    parser.add_argument("--per_gpu_eval_batch_size", default=4, type=int,
+    parser.add_argument("--per_gpu_eval_batch_size", default=20, type=int,
                         help="Batch size per GPU/CPU for evaluation.")
-    parser.add_argument('--gradient_accumulation_steps', type=int, default=1,
+    parser.add_argument('--gradient_accumulation_steps', type=int, default=2,
                         help="Number of updates steps to accumulate before performing a backward/update pass.")
     parser.add_argument("--learning_rate", default=5e-5, type=float,
                         help="The initial learning rate for Adam.")
@@ -383,21 +383,21 @@ def main():
                         help="Epsilon for Adam optimizer.")
     parser.add_argument("--max_grad_norm", default=1.0, type=float,
                         help="Max gradient norm.")
-    parser.add_argument("--num_train_epochs", default=1.0, type=float,
+    parser.add_argument("--num_train_epochs", default=10, type=float,
                         help="Total number of training epochs to perform.")
     parser.add_argument("--max_steps", default=-1, type=int,
                         help="If > 0: set total number of training steps to perform. Override num_train_epochs.")
-    parser.add_argument("--warmup_steps", default=0, type=int,
+    parser.add_argument("--warmup_steps", default=5000, type=int,
                         help="Linear warmup over warmup_steps.")
 
-    parser.add_argument('--logging_steps', type=int, default=50,
+    parser.add_argument('--logging_steps', type=int, default=1500,
                         help="Log every X updates steps.")
-    parser.add_argument('--save_steps', type=int, default=50,
+    parser.add_argument('--save_steps', type=int, default=-1,
                         help="Save checkpoint every X updates steps.")
-    parser.add_argument('--save_total_limit', type=int, default=None,
+    parser.add_argument('--save_total_limit', type=int, default=10,
                         help='Limit the total amount of checkpoints, delete the older checkpoints in the output_dir, does not delete by default')
     parser.add_argument("--eval_all_checkpoints", action='store_true',
-                        help="Evaluate all checkpoints starting with the same prefix as model_name_or_path ending and ending with step number")
+                        help="Evaluate all checkpoints starting with the same prefix as hybrid_model_path ending and ending with step number")
     parser.add_argument("--no_cuda", action='store_true',
                         help="Avoid using CUDA when available")
     parser.add_argument('--overwrite_output_dir', action='store_true',
@@ -416,7 +416,10 @@ def main():
                         help="For distributed training: local_rank")
     parser.add_argument('--server_ip', type=str, default='', help="For distant debugging.")
     parser.add_argument('--server_port', type=str, default='', help="For distant debugging.")
-    parser.add_argument("--verif_conf", default=None, type=str, required=True)
+    parser.add_argument("--verif_conf", default=None, type=str, required=False, help="The config of verification.")
+    parser.add_argument("--focal_loss_alpha", default=0.5, type=float, required=False, help="The alpha value of focal loss.")
+    parser.add_argument("--focal_loss_gamma", default=0, type=float, required=False, help="The gamma value of focal loss.")
+    parser.add_argument('--use_histogram_feature', action='store_true', help="Whether to use histogram feature")
     args = parser.parse_args()
 
 
@@ -457,28 +460,34 @@ def main():
         torch.distributed.barrier()  # Barrier to make sure only the first process in distributed training download model & vocab
 
     config_class = TableConfig
-    if args.model_type == 1:
-        model_class = FilteringModel
-    elif args.model_type == 2:
-        model_class = VerificationModel
-    else:
-        raise ValueError("Invalid model_type")
-    
-    config = config_class.from_pretrained(args.config_name if args.config_name else args.model_name_or_path,
+    config = config_class.from_pretrained(args.hybrid_model_config if args.hybrid_model_config else args.hybrid_model_path,
                                           cache_dir=args.cache_dir if args.cache_dir else None)
     
-    verif_conf = VerificationConfig(args.verif_conf)
-    ml_verif_tags = verif_conf.get_tags_by_verifier_type('ml')
-    type_vocab = load_type_vocab(args.data_dir, args.model_type, ml_verif_tags)
+    if args.model_type == 1:
+        model_class = FilteringModel
+        type_vocab = load_type_vocab(args.data_dir, args.model_type, None)
+        config.focal_loss_alpha = args.focal_loss_alpha
+        config.focal_loss_gamma = args.focal_loss_gamma
+    elif args.model_type == 2:
+        model_class = VerificationModel
+        verif_conf = VerificationConfig(args.verif_conf)
+        dl_verif_tags = verif_conf.get_tags_by_verifier_type('dl_model')
+        type_vocab = load_type_vocab(args.data_dir, args.model_type, dl_verif_tags)
+    else:
+        raise ValueError("Invalid model_type")
 
+    config.use_histogram_feature = False
+    if args.use_histogram_feature:
+        config.use_histogram_feature = True
+    
     config.class_num = len(type_vocab)
     config.model_type = args.model_type
     model = model_class(config, is_simple=True)
     if args.do_train:
-        # lm_checkpoints = list(os.path.dirname(c) for c in sorted(glob.glob(args.model_name_or_path + '/**/' + WEIGHTS_NAME, recursive=True)))
+        # lm_checkpoints = list(os.path.dirname(c) for c in sorted(glob.glob(args.hybrid_model_path + '/**/' + WEIGHTS_NAME, recursive=True)))
         # logger.info("load pre-trained model from %s", lm_checkpoints[-1])
         # lm_checkpoint = torch.load(os.path.join(lm_checkpoints[-1],"pytorch_model.bin"))
-        lm_checkpoint = torch.load(os.path.join(args.model_name_or_path,"pytorch_model.bin"))
+        lm_checkpoint = torch.load(os.path.join(args.hybrid_model_path,"pytorch_model.bin"))
         model.load_pretrained(lm_checkpoint)
         model.to(args.device)
 
@@ -492,8 +501,8 @@ def main():
         if args.local_rank not in [-1, 0]:
             torch.distributed.barrier()  # Barrier to make sure only the first process in distributed training process the dataset, and the others will use the cache
         entity_vocab = load_entity_vocab(args.data_dir, ignore_bad_title=True, min_ent_count=2)
-        train_dataset = DataProcessor(args.model_type, args.data_dir, entity_vocab, type_vocab, histogram_len=config.histogram_len, max_input_tok=500, src="train", max_length = [50, 10, 10], force_new=False, tokenizer = None)
-        eval_dataset = DataProcessor(args.model_type, args.data_dir, entity_vocab, type_vocab, histogram_len=config.histogram_len, max_input_tok=500, src="dev", max_length = [50, 10, 10], force_new=False, tokenizer = None)
+        train_dataset = DataProcessor(args.model_type, args.data_dir, entity_vocab, type_vocab, max_input_tok=500, src="train", max_length = [50, 10, 10], force_new=False, tokenizer = None)
+        eval_dataset = DataProcessor(args.model_type, args.data_dir, entity_vocab, type_vocab, max_input_tok=500, src="dev", max_length = [50, 10, 10], force_new=False, tokenizer = None)
         assert config.vocab_size == len(train_dataset.tokenizer), \
             "vocab size mismatch, vocab_size=%d"%(len(train_dataset.tokenizer))
 

@@ -10,8 +10,8 @@ class VerificationConfig():
         verif_conf = json.loads(json_data)
 
         self.tag_2_verifier_type = {}
-        for tag in verif_conf['type_verifier_tags']['ml']:
-            self.tag_2_verifier_type[tag] = 'ml'
+        for tag in verif_conf['type_verifier_tags']['dl_model']:
+            self.tag_2_verifier_type[tag] = 'dl_model'
         for tag in verif_conf['type_verifier_tags']['dict']:
             self.tag_2_verifier_type[tag] = 'dict'
         for tag in verif_conf['type_verifier_tags']['regex']:
