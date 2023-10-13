@@ -7,6 +7,8 @@ import string
 import numpy as np
 import os
 from pyarrow import parquet as pq
+from data_process.data_processor import *
+from utils.word2vec_util import *
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -120,37 +122,9 @@ def build_wikitables(data_dir, db_name, connection):
     cursor.close()
 
 
-def get_tokenized_str(str):
-    tokens = re.sub(r'[^a-zA-Z0-9]', ' ', str).split(' ')
-    tokens = [token.lower() for token in tokens if token not in string.punctuation]
-    return " ".join(tokens)
-
-
-def text_2_weighted_vector(text, word2vec):
-    words = text.split()
-    vec_list = [word2vec[word] for word in words if word in word2vec]
-    if not vec_list:
-        return np.zeros(len(list(word2vec.values())[0]))
-    weights = np.ones(len(vec_list))
-    weighted_vec = np.average(vec_list, weights=weights, axis=0)
-    return weighted_vec
-
-
-def init_word_vectors(glove_path):
-    word2vec = {}
-
-    with open(glove_path, 'r', encoding='utf-8') as file:
-        for line in file:
-            word, vector = line.strip().split(' ', 1)
-            vector = list(map(float, vector.split(' ')))
-            word2vec[word] = vector
-
-    return word2vec
-
-
 def is_tag_related_wiki(tag_name, wiki_tag_vecs, word2vec):
-    tokens = get_tokenized_str(tag_name)
-    vec = text_2_weighted_vector(tokens, word2vec)
+    tokens = word2vec.get_tokenized_str(tag_name)
+    vec = word2vec.text_2_weighted_vector(tokens)
 
     for wiki_tag_vec in wiki_tag_vecs:
         dot_product = np.dot(vec, wiki_tag_vec)
@@ -182,16 +156,17 @@ def is_table_related_wiki(metadata, table_df, git_tag_rel_flags, wikitable_tag_v
 
 
 def build_gittables(data_dir, connection, database_name, dataset_name):
+
     glove_path = os.path.join(data_dir, "glove/glove.6B.50d.txt")
-    word2vec = init_word_vectors(glove_path)
+    word2vec = Word2vecUtil(glove_path)
 
     wikitable_tag_vecs = []
 
     with open(os.path.join(data_dir, "wikitables_v2/type_vocab.txt"), 'r') as f:
         for line in f:
             _, tag = line.strip().split('\t')
-            tokens = get_tokenized_str(tag)
-            vec = text_2_weighted_vector(tokens, word2vec)
+            tokens = word2vec.get_tokenized_str(tag)
+            vec = word2vec.text_2_weighted_vector(tokens)
             wikitable_tag_vecs.append(np.array(vec))
     
     git_tag_rel_flags = {}

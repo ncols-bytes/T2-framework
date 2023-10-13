@@ -21,7 +21,7 @@ from tqdm import tqdm
 import itertools
 from multiprocessing import Pool
 from functools import partial
-from data_process.histogram_helper import HistogramHelper
+from data_process.histogram_helper import *
 
 import pdb
 

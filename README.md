@@ -8,10 +8,10 @@ For convenience, you can use the following docker image to run this repository.
 
 ```sh
 # Download the image
-$ docker pull neoffaa/transformers:v1
+$ docker pull neoffaa/t2-framework:v1
 
 # Run a container from the image
-$ docker run -itd -v <source_path>:<target_path> --name <container_name> --gpus all neoffaa/transformers:v1
+$ docker run -itd -v <source_path>:<target_path> --name <container_name> --gpus all neoffaa/t2-framework:v1
 ```
 
 In addition, you need to set up a MySQL server (8.0.x is preferred) and ensure that the docker container can access it.
@@ -115,6 +115,8 @@ Parameter explanations:
 - `--overwrite_output_dir`: Overwrite the content of the output directory.
 
 ### 2. Verification Model
+
+#### Deep Learning Verification Model
 Run the following commands to fine tune the deep learning verification model:
 ```sh
 CUDA_VISIBLE_DEVICES="0" 
@@ -124,7 +126,7 @@ python finetuning.py \
     --data_dir="data/wikitables_v2" \
     --hybrid_model_path="checkpoints/pretrained_hybrid_model" \
     --hybrid_model_config="configs/hybrid_model_config.json" \
-    --verif_conf="verification/verif_conf.json" \
+    --verif_conf="verification/verif_conf_dl_kb.json" \
     --use_histogram_feature \
     --output_dir="checkpoints/verification_model/with_hist" \
     --evaluate_during_training \
@@ -143,17 +145,33 @@ Parameter explanations:
 - `--evaluate_during_training`: Run evaluation during training at each logging step.
 - `--overwrite_output_dir`: Overwrite the content of the output directory.
 
-Besides, the knowledge-based verification models are generated in the `verification/verifiers.py` and do not require training.
+#### Random Forest Verification Models
+Run the following command to train random forest verification models:
+```sh
+python train_rf.py \
+    --data_dir="./data" \
+    --output_dir="checkpoints/random_forest_verifiers"
+```
+
+Parameter explanations:
+- `--data_dir`: The input data directory, containing wikitables and GloVe, as detailed in the "Prepare Data" section.
+- `--output_dir`: The models output directory.
+
+
+It takes a relatively long time to train all random forest verifiers, or you can also directly download the pre-trained random forest verifiers from [this link](https://drive.google.com/file/d/1ckg1BzNYzRaa90BN_ojJ09DzR527lec-/view?usp=drive_link).
+
+#### Knowledge-Based Verification Models
+The knowledge-based verification models are generated in the `verification/verifiers.py` and do not require training.
 
 ### 3. MySQL tables for testing
 Run the following commands to build MySQL tables for testing:
 ```sh
-python data_process/build_mysql_table.py \
+python build_mysql_table.py \
     --mysql_host=<mysql_host> \
     --mysql_port=<mysql_port> \
     --mysql_user=<mysql_user> \
     --mysql_password=<mysql_password> \
-    --wikitables_database=wikitable \
+    --wikitables_database=wikitables \
     --git_parent_database=parent_tables \
     --git_real_time_database=real_time_tables \
     --data_dir="./data"
@@ -176,15 +194,16 @@ python evaluation.py \
     --mysql_port=<mysql_port> \
     --mysql_user=<mysql_user> \
     --mysql_password=<mysql_password> \
-    --wikitables_database=wikitable \
+    --wikitables_database=wikitables \
     --git_parent_database=parent_tables \
     --git_real_time_database=real_time_tables \
-    --wikitables_data_dir="data/wikitables_v2/" \
+    --data_dir="./data" \
     --hybrid_model_config="configs/hybrid_model_config.json" \
     --fitlter_model_path="checkpoints/fitltering_model/with_hist/alpha0.5/pytorch_model.bin" \
     --verifi_model_path="checkpoints/verification_model/with_hist/pytorch_model.bin" \
+    --rf_models_path="checkpoints/random_forest_verifiers" \
     --use_histogram_feature \
-    --verif_conf="verification/verif_conf.json" \
+    --verif_conf="verification/verif_conf_dl_kb.json" \
     --eval_dataset=wikitables \
     --enable_phase1
 ```
@@ -196,12 +215,14 @@ Parameter explanations:
 - `--wikitables_database`: The database that stores wikitables.
 - `--git_parent_database`: The database that stores parent_tables from GitTables.
 - `--git_real_time_database`: The database that stores real_time_tables from GitTables.
-- `--wikitables_data_dir`: The original data directory of wikitables.
+- `--data_dir`: The original data directory, containing wikitables and GloVe, as detailed in the "Prepare Data" section.
 - `--hybrid_model_config`: The config of pre-trained hybrid model.
 - `--fitlter_model_path`: The fitltering model directory.
 - `--verifi_model_path`: The deep learning verification model directory.
 - `--use_histogram_feature`: Whether to use histogram feature. It should be consistent with the setting of model training.
-- `--verif_conf`: The verification config that includes mapping relationships between tags and verifiers.
+- `--verif_conf`: The verification config that includes mapping relationships between tags and verifiers, with optional values:
+    - `verification/verif_conf_dl_kb.json`: use the combination of deep learning models and knowledge-based models (DL-KB).
+    - `verification/verif_conf_rf.json`: only use random forest-based verifiers (RF).
 - `--eval_dataset`: The (mixed) dataset used for evaluation, with optional values: `wikitables`, `mix_wr`, `mix_wp`, `mix_wpr` or `mix_pr`.
 - `--enable_phase1`: Whether to enable filtering phase. If not enabled, it will become `EC`, which means exhaustive check of all verification models .
 

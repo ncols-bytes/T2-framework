@@ -108,7 +108,7 @@ class MysqlTableLoader():
                             entity_id = entity_id_map[table_id][str(row_idx) + '-' + str(col_idx)]
                         else:
                             entity_id = 0
-                        entities[col_idx].append([[row_idx, col_idx], [entity_id, cell_value]])
+                        entities[col_idx].append([[row_idx, col_idx], [entity_id, str(cell_value)]])
                     col_idx += 1
                 row_idx += 1
 

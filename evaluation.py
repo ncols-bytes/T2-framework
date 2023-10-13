@@ -1,27 +1,32 @@
 import json
 import time
 
+from sklearn.metrics import precision_score
+from sklearn.metrics import recall_score
+from sklearn.metrics import f1_score
+
 from torch.utils.data import Dataset, DataLoader, Subset
 from torch.utils.data.dataloader import default_collate
 from torch.utils.data.sampler import Sampler
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from sklearn.metrics import precision_score
-from sklearn.metrics import recall_score
-from sklearn.metrics import f1_score
+
 import mysql.connector
 import numpy as np
 import json
 import re
 import argparse
 from multiprocessing import Pool
-from utils.util import *
-from data_process.data_process import *
+from utils.vocab_util import *
+from data_process.data_processor import *
 from data_process.mysql_table_loader import *
-from verification.verifiers import *
+from verification.verification_config import *
+from verification.domain_verifiers import *
+from verification.rf_verifiers import *
 from model.configuration import TableConfig
 from model.model import FilteringModel, VerificationModel
+from utils.word2vec_util import *
 
 
 table_cnt_total = 0
@@ -52,7 +57,7 @@ def load_dl_model(model_type, model_class, config_name, checkpoint_path, wikitab
 
 
 def eval_single_dataset(dataset_name, args, device, data_processor, data_collator,
-                        verif_conf,dict_verifiers,regex_verifiers,
+                        verif_conf,dict_verifiers,regex_verifiers,rf_verifiers,
                         model_f1,idx_2_tag_f1,type_vocab_f1,
                         model_f2,idx_2_tag_f2,type_vocab_f2):
     Y_true = []
@@ -85,7 +90,7 @@ def eval_single_dataset(dataset_name, args, device, data_processor, data_collato
 
     if dataset_name == 'wikitables':
         # load label and entity_id from original json
-        with open(os.path.join(args.wikitables_data_dir, "test.table_col_type.json"), "r") as fcc_file:
+        with open(os.path.join(args.data_dir, "wikitables_v2/test.table_col_type.json"), "r") as fcc_file:
             fcc_data = json.load(fcc_file)
             for table_idx in range(len(fcc_data)):
                 table_id = fcc_data[table_idx][0]
@@ -185,6 +190,10 @@ def eval_single_dataset(dataset_name, args, device, data_processor, data_collato
                         ent_samples = [cell[1][1] for cell in entities[col_idx][:10]]
                         if regex_verifiers.verify(pred_tag, ent_samples) == True:
                             pred_tags_col_f2.append(pred_tag)
+                    elif verif_conf.get_verifier_type_by_tag(pred_tag) == 'rf':
+                        ent_samples = [cell[1][1] for cell in entities[col_idx][:10]]
+                        if rf_verifiers.verify(pred_tag, pgTitle, secTitle, caption, headers[col_idx], ent_samples) == True:
+                            pred_tags_col_f2.append(pred_tag)
                     elif verif_conf.get_verifier_type_by_tag(pred_tag) == 'dl_model':
                         need_ml_verify_cols.append(col_idx)
                 pred_tags_table_f2.append(pred_tags_col_f2)
@@ -224,7 +233,7 @@ def eval_single_dataset(dataset_name, args, device, data_processor, data_collato
                         pred_tags_f2 = [idx_2_tag_f2[i] for i, x in enumerate(prediction_labels[col_idx]) if x == True]
                         pred_tags_table_f2[col_idx].extend(pred_tags_f2)
 
-                model_predict_time_f2 += time.time() - model_predict_start_time_f2
+            model_predict_time_f2 += time.time() - model_predict_start_time_f2
 
         for col_idx in range(len(headers)):
             y_pred = [False] * len(type_vocab_f1)
@@ -290,10 +299,11 @@ def main():
     parser.add_argument("--wikitables_database", default=None, type=str, required=True)
     parser.add_argument("--git_parent_database", default=None, type=str, required=True)
     parser.add_argument("--git_real_time_database", default=None, type=str, required=True)
-    parser.add_argument("--wikitables_data_dir", default=None, type=str, required=True)
+    parser.add_argument("--data_dir", default=None, type=str, required=True)
     parser.add_argument("--hybrid_model_config", default=None, type=str, required=True)
     parser.add_argument("--fitlter_model_path", default=None, type=str, required=True)
-    parser.add_argument("--verifi_model_path", default=None, type=str, required=True)
+    parser.add_argument("--verifi_model_path", default=None, type=str, required=False)
+    parser.add_argument("--rf_models_path", default=None, type=str, required=False)
     parser.add_argument("--verif_conf", default=None, type=str, required=True)
     parser.add_argument("--eval_dataset", default=None, type=str, required=True)
     parser.add_argument('--use_histogram_feature', action='store_true', help="Whether to use histogram feature")
@@ -302,7 +312,8 @@ def main():
 
     device = torch.device('cuda')
 
-    entity_vocab = load_entity_vocab(args.wikitables_data_dir, ignore_bad_title=True, min_ent_count=2)
+    wikitables_data_dir = os.path.join(args.data_dir, "wikitables_v2")
+    entity_vocab = load_entity_vocab(wikitables_data_dir, ignore_bad_title=True, min_ent_count=2)
 
     data_processor = DataProcessor(None, None, entity_vocab, type_vocab=None, max_input_tok=500, src="test", max_length = [50, 10, 10], force_new=True, tokenizer = None)
     data_collator = DataCollator(None, data_processor.tokenizer, is_train=False)
@@ -311,16 +322,27 @@ def main():
     if args.use_histogram_feature:
         use_hist_feature = True
 
-    model_f1, type_vocab_f1 = load_dl_model(1, FilteringModel, args.hybrid_model_config, args.fitlter_model_path, args.wikitables_data_dir, use_hist_feature, device, None)
+    model_f1, type_vocab_f1 = load_dl_model(1, FilteringModel, args.hybrid_model_config, args.fitlter_model_path, wikitables_data_dir, use_hist_feature, device, None)
     print('load filtering model finished.')
 
+    dict_verifiers, regex_verifiers, rf_verifiers, dl_model_f2 = None, None, None, None
     verif_conf = VerificationConfig(args.verif_conf)
-    dict_verifiers = DictVerifiers(args.wikitables_data_dir)
-    regex_verifiers = RegexVerifiers()
-    dl_verif_tags = verif_conf.get_tags_by_verifier_type('dl_model')  
+    
+    if len(verif_conf.get_tags_by_verifier_type('regex')) > 0:
+        regex_verifiers = RegexVerifiers()
+    if len(verif_conf.get_tags_by_verifier_type('dict')) > 0:
+        dict_verifiers = DictVerifiers(wikitables_data_dir)
+    if len(verif_conf.get_tags_by_verifier_type('rf')) > 0:
+        glove_path = os.path.join(args.data_dir, "glove/glove.6B.50d.txt")
+        word2vec = Word2vecUtil(glove_path)
+        rf_verifiers = RFVerifiers(word2vec)
+        rf_verifiers.load_saved_models(args.rf_models_path)
 
-    model_f2, type_vocab_f2 = load_dl_model(2, VerificationModel, args.hybrid_model_config, args.verifi_model_path, args.wikitables_data_dir, use_hist_feature, device, dl_verif_tags)
-    print('load verification model finished.')
+    dl_model_f2, type_vocab_f2 = None, {}
+    dl_verif_tags = verif_conf.get_tags_by_verifier_type('dl_model')  
+    if len(dl_verif_tags) > 0:
+        dl_model_f2, type_vocab_f2 = load_dl_model(2, VerificationModel, args.hybrid_model_config, args.verifi_model_path, wikitables_data_dir, use_hist_feature, device, dl_verif_tags)
+        print('load verification model finished.')
 
     idx_2_tag_f1 = {}
     idx_2_tag_f2 = {}
@@ -332,21 +354,21 @@ def main():
     eval_dataset = args.eval_dataset.lower()
     if eval_dataset in ['wikitables', 'mix_wr', 'mix_wp', 'mix_wpr']:
         acc_metrics = eval_single_dataset("wikitables", args, device, data_processor, data_collator, \
-                                                                            verif_conf,dict_verifiers,regex_verifiers, \
+                                                                            verif_conf,dict_verifiers,regex_verifiers,rf_verifiers, \
                                                                             model_f1,idx_2_tag_f1,type_vocab_f1, \
-                                                                            model_f2,idx_2_tag_f2,type_vocab_f2)
+                                                                            dl_model_f2,idx_2_tag_f2,type_vocab_f2)
 
     if eval_dataset in ['mix_wp', 'mix_wpr', 'mix_pr']:
         eval_single_dataset("parent_tables", args, device, data_processor, data_collator, \
-                                                                verif_conf,dict_verifiers,regex_verifiers, \
+                                                                verif_conf,dict_verifiers,regex_verifiers,rf_verifiers, \
                                                                 model_f1,idx_2_tag_f1,type_vocab_f1, \
-                                                                model_f2,idx_2_tag_f2,type_vocab_f2)
+                                                                dl_model_f2,idx_2_tag_f2,type_vocab_f2)
     
     if eval_dataset in ['mix_wr', 'mix_wpr', 'mix_pr']:
         eval_single_dataset("real_time_tables", args, device, data_processor, data_collator, \
-                                                                    verif_conf,dict_verifiers,regex_verifiers, \
+                                                                    verif_conf,dict_verifiers,regex_verifiers,rf_verifiers, \
                                                                     model_f1,idx_2_tag_f1,type_vocab_f1, \
-                                                                    model_f2,idx_2_tag_f2,type_vocab_f2)
+                                                                    dl_model_f2,idx_2_tag_f2,type_vocab_f2)
 
     print()
     print(f"########## Evaluation of {eval_dataset} dataset ##########")

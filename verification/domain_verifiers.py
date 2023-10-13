@@ -3,28 +3,6 @@ import json
 import os
 
 
-class VerificationConfig():
-    def __init__(self, config):
-        with open(config, 'r') as file:
-            json_data = file.read()
-        verif_conf = json.loads(json_data)
-
-        self.tag_2_verifier_type = {}
-        for tag in verif_conf['type_verifier_tags']['dl_model']:
-            self.tag_2_verifier_type[tag] = 'dl_model'
-        for tag in verif_conf['type_verifier_tags']['dict']:
-            self.tag_2_verifier_type[tag] = 'dict'
-        for tag in verif_conf['type_verifier_tags']['regex']:
-            self.tag_2_verifier_type[tag] = 'regex'
-
-        self.verifier_type_2_tags = verif_conf['type_verifier_tags']
-        
-    def get_verifier_type_by_tag(self, tag):
-        return self.tag_2_verifier_type[tag]
-
-    def get_tags_by_verifier_type(self, verifier_type):
-        return self.verifier_type_2_tags[verifier_type]
-
 class DictVerifiers():
     def __init__(self, data_dir):
         self.tag_2_header_set = {}

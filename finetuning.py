@@ -44,13 +44,13 @@ except:
 
 from tqdm import tqdm, trange
 
-from data_process.data_process import *
+from data_process.data_processor import *
 from model.configuration import TableConfig
 from model.model import FilteringModel, VerificationModel
 from model.transformers import BertTokenizer, WEIGHTS_NAME, AdamW, get_linear_schedule_with_warmup
 from model.metric import *
-from utils.util import *
-from verification.verifiers import *
+from utils.vocab_util import *
+from verification.verification_config import *
 
 logger = logging.getLogger(__name__)
 
