@@ -1,6 +1,6 @@
 # T2-framework
 
-This repository provides code for T2:Two-phase Tagging auto tagging framework.
+This repository provides code for T2, a two-phase tagging framework for relational data. Tags are semantic types annotated to data and can drive a wide range of applications, such as data asset discovery and searching, sensitive data recognition and protection, data analysis, and machine learning pipelines, etc. T2 is particularly effective and efficient in tagging relational data when dealing with a large number of tables from diverse customers in the cloud.
 
 ## Environment
 
