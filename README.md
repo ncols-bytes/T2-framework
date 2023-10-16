@@ -32,8 +32,6 @@ Download the following files with the same name from the `data` directory of [th
     	└── type_vocab.txt
 ```
 
-Please note that the `train.table_col_type.json` file in the link has been truncated, causing the JSON format to be corrupted. You need to modify the end of `train.table_col_type.json` to restore its correct format.
-
 ### 2. GitTables data
 
 Download `parent_tables_licensed.zip` and `real_time_tables_licensed.zip` from [this link](https://zenodo.org/record/6517052), put them in the `data/gittables` directory and unzip them.
@@ -187,7 +185,7 @@ Parameter explanations:
 - `--data_dir`: The data directory, containing wikitables and gittables data, as detailed in the "Prepare Data" section.
 
 ### 4. Evaluation
-Run the following commands to get evaluation result:
+Run the following commands to get evaluation results:
 ```sh
 python evaluation.py \
     --mysql_host=<mysql_host> \
